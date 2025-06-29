@@ -1,0 +1,177 @@
+# Based on https://github.com/travier/fedora-kinoite/blob/main/.github/workflows/fedora-kinoite.yml
+
+name: "Build Fedora Kinoite image"
+
+env:
+  REGISTRY: ghcr.io/${{ github.repository_owner }}
+  IMAGE_NAME: fedora-kinoite
+  BASE_IMAGE: quay.io/fedora/fedora-kinoite:latest
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'fedora-kinoite/**'
+      - '.github/workflows/fedora-kinoite.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'fedora-kinoite/**'
+      - '.github/workflows/fedora-kinoite.yml'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Override version label (org.opencontainers.image.version)'
+        required: false
+        default: ''
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: 
+      image: quay.io/containers/podman
+      options: --privileged --volume /:/run/host:rw --user 0:0
+    permissions:
+      contents: read
+      packages: write
+      # This is used to complete the identity challenge
+      # with sigstore/fulcio when running outside of PRs.
+      id-token: write
+
+    steps:
+      - name: Downcase REGISTRY
+        run: |
+          echo "REGISTRY=${REGISTRY,,}" >> ${GITHUB_ENV}
+
+      - name: Reclaim disk space
+        run: |
+          set -euxo pipefail
+          rm -rf /run/host/usr/local/lib/android
+          rm -rf /run/host/usr/share/dotnet
+          rm -rf /run/host/opt/ghc
+          rm -rf /run/host/usr/local/share/boost
+
+      - name: Install prereqs
+        run: |
+          set -euxo pipefail
+          dnf upgrade -y --refresh
+          dnf install -y buildah skopeo rpm-ostree jq --exclude container-selinux
+        # --enablerepo=updates-testing --refresh --advisory=FEDORA-2025-4b9488bb4d
+
+      - name: Install cosign
+        if: github.event_name != 'pull_request'
+        uses: sigstore/cosign-installer@v3
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Add missing .docker folder
+        run: |
+          mkdir -p /github/home/.docker/
+
+      - name: Login to Container Registry
+        uses: redhat-actions/podman-login@v1
+        if: github.event_name != 'pull_request'
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          auth_file_path: /tmp/auth.json
+
+      - name: Figure out version
+        id: version
+        run: |
+          set -exo pipefail
+          if [[ -n ${VERSION} ]]; then
+            version="${VERSION}"
+          else
+            version_base="$(skopeo inspect docker://${BASE_IMAGE} | jq -r '.Labels."org.opencontainers.image.version"')"
+            version_derived="$(skopeo inspect docker://${REGISTRY}/${IMAGE_NAME} | jq -r '.Labels."org.opencontainers.image.version"' || true)"
+            if [[ -z "${version_derived}" ]]; then
+              version="${version_base}"
+            elif [[ "${version_base}" == "${version_derived}" ]]; then
+              patch="${version_base##*\.}"
+              ((patch++)) || true
+              version="${version_base%\.*}.${patch}"
+            else
+              version="${version_base}"
+            fi
+          fi
+          echo "Using version: ${version}"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+        env:
+          VERSION: ${{ inputs.version }}
+
+      - name: Build container image
+        uses: redhat-actions/buildah-build@v2
+        with:
+          image: ${{ env.IMAGE_NAME }}
+          tags: build
+          containerfiles: ${{ env.IMAGE_NAME }}/Containerfile
+          context: ${{ env.IMAGE_NAME }}
+          layers: false
+          oci: true
+
+      - name: Rechunk container image
+        run: |
+          rpm-ostree compose build-chunked-oci \
+            --bootc --format-version=1 \
+            --max-layers 96 \
+            --from localhost/${IMAGE_NAME}:build \
+            --output containers-storage:localhost/${IMAGE_NAME}:rechunked
+
+      - name: Write NOP Containerfile
+        run: |
+          echo "FROM localhost/${IMAGE_NAME}:rechunked" > ${IMAGE_NAME}/Containerfile.labels
+
+      - name: Add labels to container image
+        uses: redhat-actions/buildah-build@v2
+        with:
+          image: ${{ env.IMAGE_NAME }}
+          tags: latest
+          containerfiles: ${{ env.IMAGE_NAME }}/Containerfile.labels
+          context: ${{ env.IMAGE_NAME }}
+          layers: false
+          oci: true
+          labels: |
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}
+            org.opencontainers.image.title=Fedora Kinoite
+            org.opencontainers.image.description=Customized image of Fedora Kinoite
+            org.opencontainers.image.source=https://github.com/QuanTrinhCA/custom-fedora
+            org.opencontainers.image.licenses=MIT
+
+      - name: Push to Container Registry
+        uses: redhat-actions/push-to-registry@v2
+        id: push
+        if: github.event_name != 'pull_request'
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          image: ${{ env.IMAGE_NAME }}
+          tags: latest
+          extra-args: |
+            --compression-format=zstd
+
+      # Sign the resulting Docker image digest except on PRs.
+      # This will only write to the public Rekor transparency log when the Docker
+      # repository is public to avoid leaking data.  If you would like to publish
+      # transparency data even for private images, pass --force to cosign below.
+      # https://github.com/sigstore/cosign
+      - name: Sign the published container image
+        if: ${{ github.event_name != 'pull_request' }}
+        env:
+          # https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-an-intermediate-environment-variable
+          TAGS: ${{ steps.meta.outputs.tags }}
+          DIGEST: ${{ steps.build-and-push.outputs.digest }}
+        # This step uses the identity token to provision an ephemeral certificate
+        # against the sigstore community Fulcio instance.
+        run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
