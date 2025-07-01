@@ -91,25 +91,19 @@ jobs:
         id: version
         run: |
           set -exo pipefail
-          if [[ -n ${VERSION} ]]; then
-            version="${VERSION}"
+          if [[ -n ${VERSION_OVERRIDE} ]]; then
+            version_base="${VERSION_OVERRIDE}"
           else
             version_base="$(skopeo inspect docker://${BASE_IMAGE} | jq -r '.Labels."org.opencontainers.image.version"')"
-            version_derived="$(skopeo inspect docker://${REGISTRY}/${IMAGE_NAME} | jq -r '.Labels."org.opencontainers.image.version"' || true)"
-            if [[ -z "${version_derived}" ]]; then
-              version="${version_base}"
-            elif [[ "${version_base}" == "${version_derived}" ]]; then
-              patch="${version_base##*\.}"
-              ((patch++)) || true
-              version="${version_base%\.*}.${patch}"
-            else
-              version="${version_base}"
-            fi
           fi
-          echo "Using version: ${version}"
+          build_date="$(date -u +"%Y%m%dT%H%M%SZ")"
+          tag="${version_base}-${build_date}"
+          version="${version_base}+${build_date}"
+          echo "Base version: ${version_base}"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION_OVERRIDE: ${{ inputs.version }}
 
       - name: Build container image
         uses: redhat-actions/buildah-build@v2
@@ -139,7 +133,7 @@ jobs:
         id: relabel
         with:
           image: ${{ env.IMAGE_NAME }}
-          tags: latest ${{ steps.version.outputs.version }}
+          tags: latest ${{ steps.version.outputs.tag }}
           containerfiles: ${{ env.IMAGE_NAME }}/Containerfile.labels
           context: ${{ env.IMAGE_NAME }}
           layers: true
