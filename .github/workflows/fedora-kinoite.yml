@@ -34,17 +34,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  build-image:
     runs-on: ubuntu-latest
+
     container: 
       image: quay.io/containers/podman
       options: --privileged --volume /:/run/host:rw --user 0:0
+
     permissions:
       contents: read
       packages: write
-      # This is used to complete the identity challenge
-      # with sigstore/fulcio when running outside of PRs.
-      id-token: write
+
+    outputs:
+      digest: ${{ steps.push.outputs.digest }}
+      registry: ${{ env.REGISTRY }}
+      image: ${{ steps.relabel.outputs.image }}
 
     steps:
       - name: Downcase REGISTRY
@@ -54,21 +58,18 @@ jobs:
       - name: Reclaim disk space
         run: |
           set -euxo pipefail
-          rm -rf /run/host/usr/local/lib/android
-          rm -rf /run/host/usr/share/dotnet
-          rm -rf /run/host/opt/ghc
-          rm -rf /run/host/usr/local/share/boost
+          rm -rf \
+          /run/host/usr/share/dotnet \
+          /run/host/usr/local/lib/android \
+          /run/host/opt/ghc \
+          /run/host/opt/hostedtoolcache/CodeQL \
+          /run/host/usr/local/share/boost
 
       - name: Install prereqs
         run: |
           set -euxo pipefail
           dnf upgrade -y --refresh
           dnf install -y buildah skopeo rpm-ostree jq --exclude container-selinux
-        # --enablerepo=updates-testing --refresh --advisory=FEDORA-2025-4b9488bb4d
-
-      - name: Install cosign
-        if: github.event_name != 'pull_request'
-        uses: sigstore/cosign-installer@v3
 
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -79,7 +80,7 @@ jobs:
 
       - name: Login to Container Registry
         uses: redhat-actions/podman-login@v1
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -112,12 +113,13 @@ jobs:
 
       - name: Build container image
         uses: redhat-actions/buildah-build@v2
+        id: build
         with:
           image: ${{ env.IMAGE_NAME }}
           tags: build
           containerfiles: ${{ env.IMAGE_NAME }}/Containerfile
           context: ${{ env.IMAGE_NAME }}
-          layers: false
+          layers: true
           oci: true
 
       - name: Rechunk container image
@@ -125,53 +127,48 @@ jobs:
           rpm-ostree compose build-chunked-oci \
             --bootc --format-version=1 \
             --max-layers 96 \
-            --from localhost/${IMAGE_NAME}:build \
-            --output containers-storage:localhost/${IMAGE_NAME}:rechunked
+            --from localhost/${{ steps.build.outputs.image-with-tag }} \
+            --output containers-storage:localhost/${{ steps.build.outputs.image }}:rechunked
 
       - name: Write NOP Containerfile
         run: |
-          echo "FROM localhost/${IMAGE_NAME}:rechunked" > ${IMAGE_NAME}/Containerfile.labels
-
+          echo "FROM localhost/${{ steps.build.outputs.image }}:rechunked" > ${{ env.IMAGE_NAME }}/Containerfile.labels
+      
       - name: Add labels to container image
         uses: redhat-actions/buildah-build@v2
+        id: relabel
         with:
           image: ${{ env.IMAGE_NAME }}
-          tags: latest
+          tags: latest ${{ steps.version.outputs.version }}
           containerfiles: ${{ env.IMAGE_NAME }}/Containerfile.labels
           context: ${{ env.IMAGE_NAME }}
-          layers: false
+          layers: true
           oci: true
           labels: |
             org.opencontainers.image.version=${{ steps.version.outputs.version }}
             org.opencontainers.image.title=Fedora Kinoite
             org.opencontainers.image.description=Customized image of Fedora Kinoite
-            org.opencontainers.image.source=https://github.com/QuanTrinhCA/custom-fedora
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.licenses=MIT
 
       - name: Push to Container Registry
         uses: redhat-actions/push-to-registry@v2
         id: push
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-          image: ${{ env.IMAGE_NAME }}
-          tags: latest
+          image: ${{ steps.relabel.outputs.image }}
+          tags: ${{ steps.relabel.outputs.tags }}
           extra-args: |
             --compression-format=zstd
 
-      # Sign the resulting Docker image digest except on PRs.
-      # This will only write to the public Rekor transparency log when the Docker
-      # repository is public to avoid leaking data.  If you would like to publish
-      # transparency data even for private images, pass --force to cosign below.
-      # https://github.com/sigstore/cosign
-      - name: Sign the published container image
-        if: ${{ github.event_name != 'pull_request' }}
-        env:
-          # https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-an-intermediate-environment-variable
-          TAGS: ${{ steps.meta.outputs.tags }}
-          DIGEST: ${{ steps.build-and-push.outputs.digest }}
-        # This step uses the identity token to provision an ephemeral certificate
-        # against the sigstore community Fulcio instance.
-        run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
+  sign-published-image:
+    uses: ./.github/workflows/signing.yml
+    needs: [build-image]
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    with:
+      digest: ${{ needs.build-image.outputs.digest }}
+      registry: ${{ needs.build-image.outputs.registry }}
+      image: ${{ needs.build-image.outputs.image }}
