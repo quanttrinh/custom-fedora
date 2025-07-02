@@ -6,6 +6,9 @@ env:
   REGISTRY: ghcr.io/${{ github.repository_owner }}
   IMAGE_NAME: fedora-kinoite
   BASE_IMAGE: quay.io/fedora/fedora-kinoite:latest
+  OCI_DESCRIPTION: Customized image of Fedora Kinoite
+  OCI_TITLE: Fedora Kinoite
+  OCI_LICENSE: MIT
 
 on:
   schedule:
@@ -48,7 +51,7 @@ jobs:
     outputs:
       digest: ${{ steps.push.outputs.digest }}
       registry: ${{ env.REGISTRY }}
-      image: ${{ steps.relabel.outputs.image }}
+      image: ${{ env.IMAGE_NAME }}
 
     steps:
       - name: Downcase REGISTRY
@@ -100,50 +103,61 @@ jobs:
           tag="${version_base}-${build_date}"
           version="${version_base}+${build_date}"
           echo "Base version: ${version_base}"
-          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag,,}" >> "$GITHUB_OUTPUT"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
         env:
           VERSION_OVERRIDE: ${{ inputs.version }}
 
       - name: Build container image
-        uses: redhat-actions/buildah-build@v2
-        id: build
-        with:
-          image: ${{ env.IMAGE_NAME }}
-          tags: build
-          containerfiles: ${{ env.IMAGE_NAME }}/Containerfile
-          context: ${{ env.IMAGE_NAME }}
-          layers: true
-          oci: true
+        run: |
+          buildah build \
+          -f ${{ env.IMAGE_NAME }}/Containerfile \
+          --format oci \
+          --tls-verify=true \
+          --layers=true \
+          --label org.opencontainers.image.version="${{ steps.version.outputs.version }}" \
+          --label org.opencontainers.image.title="${{ env.OCI_TITLE }}" \
+          --label org.opencontainers.image.description="${{ env.OCI_DESCRIPTION }}" \
+          --label org.opencontainers.image.source="${{ github.server_url }}/${{ github.repository }}" \
+          --label org.opencontainers.image.licenses="${{ env.OCI_LICENSE }}" \
+          --annotation org.opencontainers.image.version="${{ steps.version.outputs.version }}" \
+          --annotation org.opencontainers.image.title="${{ env.OCI_TITLE }}" \
+          --annotation org.opencontainers.image.description="${{ env.OCI_DESCRIPTION }}" \
+          --annotation org.opencontainers.image.source="${{ github.server_url }}/${{ github.repository }}" \
+          --annotation org.opencontainers.image.licenses="${{ env.OCI_LICENSE }}" \
+          -t ${{ env.IMAGE_NAME }}:build \
+          ${{ env.IMAGE_NAME }}
+        working-directory: ${{ github.workspace }}
 
       - name: Rechunk container image
         run: |
           rpm-ostree compose build-chunked-oci \
             --bootc --format-version=1 \
             --max-layers 96 \
-            --from localhost/${{ steps.build.outputs.image-with-tag }} \
-            --output containers-storage:localhost/${{ steps.build.outputs.image }}:rechunked
+            --from localhost/${{ env.IMAGE_NAME }}:build \
+            --output containers-storage:localhost/${{ env.IMAGE_NAME }}:rechunked
 
-      - name: Write NOP Containerfile
+      - name: Build container image
         run: |
-          echo "FROM localhost/${{ steps.build.outputs.image }}:rechunked" > ${{ env.IMAGE_NAME }}/Containerfile.labels
-      
-      - name: Add labels to container image
-        uses: redhat-actions/buildah-build@v2
-        id: relabel
-        with:
-          image: ${{ env.IMAGE_NAME }}
-          tags: latest ${{ steps.version.outputs.tag }}
-          containerfiles: ${{ env.IMAGE_NAME }}/Containerfile.labels
-          context: ${{ env.IMAGE_NAME }}
-          layers: true
-          oci: true
-          labels: |
-            org.opencontainers.image.version=${{ steps.version.outputs.version }}
-            org.opencontainers.image.title=Fedora Kinoite
-            org.opencontainers.image.description=Customized image of Fedora Kinoite
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.licenses=MIT
+          buildah build \
+          --from localhost/${{ env.IMAGE_NAME }}:rechunked \
+          --format oci \
+          --tls-verify=true \
+          --layers=true \
+          --label org.opencontainers.image.version="${{ steps.version.outputs.version }}" \
+          --label org.opencontainers.image.title="${{ env.OCI_TITLE }}" \
+          --label org.opencontainers.image.description="${{ env.OCI_DESCRIPTION }}" \
+          --label org.opencontainers.image.source="${{ github.server_url }}/${{ github.repository }}" \
+          --label org.opencontainers.image.licenses="${{ env.OCI_LICENSE }}" \
+          --annotation org.opencontainers.image.version="${{ steps.version.outputs.version }}" \
+          --annotation org.opencontainers.image.title="${{ env.OCI_TITLE }}" \
+          --annotation org.opencontainers.image.description="${{ env.OCI_DESCRIPTION }}" \
+          --annotation org.opencontainers.image.source="${{ github.server_url }}/${{ github.repository }}" \
+          --annotation org.opencontainers.image.licenses="${{ env.OCI_LICENSE }}" \
+          -t ${{ env.IMAGE_NAME }}:latest \
+          -t ${{ env.IMAGE_NAME }}:${{ steps.version.outputs.tag }} \
+          ${{ env.IMAGE_NAME }}
+        working-directory: ${{ github.workspace }}
 
       - name: Push to Container Registry
         uses: redhat-actions/push-to-registry@v2
@@ -153,8 +167,8 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-          image: ${{ steps.relabel.outputs.image }}
-          tags: ${{ steps.relabel.outputs.tags }}
+          image: ${{ env.IMAGE_NAME }}
+          tags: latest ${{ steps.version.outputs.tag }}
           extra-args: |
             --compression-format=zstd
 
