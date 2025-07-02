@@ -21,6 +21,14 @@ jobs:
       - name: Install cosign
         uses: sigstore/cosign-installer@v3
 
+      - name: Login to Container Registry
+        run: |
+          cosign login ${REGISTRY%%/*} \
+          --username ${{ github.actor }} \
+          --password ${{ secrets.GITHUB_TOKEN }}
+        env:
+          REGISTRY: ${{ inputs.registry }}
+
       - name: Sign the published container image
         run: |
           cosign sign \
