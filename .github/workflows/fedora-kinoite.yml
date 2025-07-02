@@ -166,3 +166,4 @@ jobs:
       digest: ${{ needs.build-image.outputs.digest }}
       registry: ${{ needs.build-image.outputs.registry }}
       image: ${{ needs.build-image.outputs.image }}
+    secrets: inherit
