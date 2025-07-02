@@ -161,6 +161,8 @@ jobs:
   sign-published-image:
     uses: ./.github/workflows/signing.yml
     needs: [build-image]
+    permissions:
+      packages: write
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     with:
       digest: ${{ needs.build-image.outputs.digest }}

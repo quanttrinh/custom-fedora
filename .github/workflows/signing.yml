@@ -16,7 +16,12 @@ on:
 jobs:
   sign:
     runs-on: ubuntu-latest
+
     environment: cosign-signing
+
+    permissions:
+      packages: write
+
     steps:
       - name: Install cosign
         uses: sigstore/cosign-installer@v3
