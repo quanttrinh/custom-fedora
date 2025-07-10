@@ -125,8 +125,10 @@ jobs:
           --annotation org.opencontainers.image.description="${{ env.OCI_DESCRIPTION }}" \
           --annotation org.opencontainers.image.source="${{ github.server_url }}/${{ github.repository }}" \
           --annotation org.opencontainers.image.licenses="${{ env.OCI_LICENSE }}" \
+          --secret=id=cosign_pubic_key,src=shared/keys/ghcr.io-quanttrinh-fedora-kinoite.pub \
+          --secret=id=add_containers_policy,src=scripts/add_containers_policy.sh \
           -t ${{ env.IMAGE_NAME }}:build \
-          ${{ env.IMAGE_NAME }}
+          .
         working-directory: ${{ github.workspace }}
 
       - name: Rechunk container image
