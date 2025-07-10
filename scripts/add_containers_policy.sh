@@ -29,14 +29,12 @@ jq '
     }
   )
 }
-' /etc/containers/policy.json | tee /etc/containers/policy.json
-echo $(cat /etc/containers/policy.json)
+' /etc/containers/policy.json > /etc/containers/policy.json
 
 mkdir -p /etc/containers/registries.d
-echo \
-'
+cat <<EOF > /etc/containers/registries.d/ghcr.io-quanttrinh-fedora-kinoite.yaml
 docker:
     ghcr.io/quanttrinh/fedora-kinoite:
         use-sigstore-attachments: true
-' | tee /etc/containers/registries.d/ghcr.io-quanttrinh-fedora-kinoite.yaml
+EOF
 restorecon -RFv /etc/containers/registries.d/ghcr.io-quanttrinh-fedora-kinoite.yaml
