@@ -30,6 +30,7 @@ jq '
   )
 }
 ' /etc/containers/policy.json | tee /etc/containers/policy.json
+echo $(cat /etc/containers/policy.json)
 
 mkdir -p /etc/containers/registries.d
 echo \
