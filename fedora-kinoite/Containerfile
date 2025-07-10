@@ -11,7 +11,7 @@ dnf swap -y $(rpm -q rpmfusion-nonfree-release) rpmfusion-nonfree-release
 dnf install -y rpmfusion-nonfree-release-tainted
 
 dnf copr enable -y quantt/libfprint-tod
-dnf copr enable ilyaz/LACT
+dnf copr enable -y ilyaz/LACT
 
 sed -i 's/enabled=1/enabled=0/' \
 /etc/yum.repos.d/_copr:copr.fedorainfracloud.org:phracek:PyCharm.repo \
