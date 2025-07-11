@@ -14,27 +14,25 @@ if [ ! -s "$POLICY_FILE" ]; then
     echo "$POLICY_FILE does not exist, generating default..."
     cat <<EOF > "$POLICY_FILE"
 {
-    "default": [
-        {
-            "type": "reject"
-        }
-    ],
-    "transports":
-        {
-            "docker-daemon":
-                {
-                    "": [{"type":"insecureAcceptAnything"}]
-                }
-        }
+  "default": [
+    {
+      "type": "reject"
+    }
+  ],
+  "transports": {
+    "docker-daemon": {
+      "": [{"type":"insecureAcceptAnything"}]
+    }
+  }
 }
 EOF
 fi
 jq '
 . + {
   transports: (
-    .transports + {
+    (.transports // {}) + {
       "docker": (
-        .transports["docker"] + {
+        (.transports["docker"] // {}) + {
           "ghcr.io/quanttrinh/fedora-kinoite": [
             {
               "type": "sigstoreSigned",
@@ -49,7 +47,16 @@ jq '
     }
   )
 }
-' "$POLICY_FILE" > "$POLICY_FILE"
+' "$POLICY_FILE" > "$POLICY_FILE-tmp"
+mv "$POLICY_FILE-tmp" "$POLICY_FILE"
+jq '
+. + {
+  default: (
+    ((.default // []) | map(select(. != { "type": "insecureAcceptAnything" }))) + [{ "type": "reject" }]
+  )
+}
+' "$POLICY_FILE" > "$POLICY_FILE-tmp"
+mv "$POLICY_FILE-tmp" "$POLICY_FILE"
 
 mkdir -p /etc/containers/registries.d
 cat <<EOF > /etc/containers/registries.d/ghcr.io-quanttrinh-fedora-kinoite.yaml
