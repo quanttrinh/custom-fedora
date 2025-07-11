@@ -8,6 +8,14 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
+VARIANT=$1
+if [[ "$VARIANT" != "fedora-kinoite" && "$VARIANT" != "fedora-silverblue" ]]; then
+  echo "Usage: $0 <variant>" >&2
+  echo "Where <variant> is either 'fedora-kinoite' or 'fedora-silverblue'" >&2
+  exit 1
+fi
+echo "Selected variant: $VARIANT"
+
 POLICY_FILE=/etc/containers/policy.json
 mkdir -p /etc/containers/
 if [ ! -s "$POLICY_FILE" ]; then
@@ -27,21 +35,21 @@ if [ ! -s "$POLICY_FILE" ]; then
 }
 EOF
 fi
-jq '
+jq --arg variant "ghcr.io/quanttrinh/$VARIANT" '
 . + {
   transports: (
     (.transports // {}) + {
       "docker": (
         (.transports["docker"] // {}) + {
-          "ghcr.io/quanttrinh/fedora-kinoite": [
+          ($variant): [
             {
               "type": "sigstoreSigned",
-              "keyPath": "/etc/pki/containers/ghcr.io-quanttrinh-fedora-kinoite.pub",
+              "keyPath": "/etc/pki/containers/ghcr.io-quanttrinh-custom-fedora.pub",
               "signedIdentity": {
                 "type": "matchRepository"
               }
             }
-          ],
+          ]
         }
       )
     }
@@ -59,9 +67,9 @@ jq '
 mv "$POLICY_FILE-tmp" "$POLICY_FILE"
 
 mkdir -p /etc/containers/registries.d
-cat <<EOF > /etc/containers/registries.d/ghcr.io-quanttrinh-fedora-kinoite.yaml
+cat <<EOF > /etc/containers/registries.d/ghcr.io-quanttrinh.yaml
 docker:
-    ghcr.io/quanttrinh/fedora-kinoite:
+    ghcr.io/quanttrinh:
         use-sigstore-attachments: true
 EOF
-restorecon -RFv /etc/containers/registries.d/ghcr.io-quanttrinh-fedora-kinoite.yaml
+restorecon -RFv /etc/containers/registries.d/ghcr.io-quanttrinh.yaml

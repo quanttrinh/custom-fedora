@@ -1,0 +1,61 @@
+name: "Build Fedora images"
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'shared/*'
+      - 'scripts/*'
+      - 'build/*'
+      - '.github/workflows/common-build.yml'
+      - '.github/workflows/common-signing.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'shared/*'
+      - 'scripts/*'
+      - 'build/*'
+      - '.github/workflows/common-build.yml'
+      - '.github/workflows/common-signing.yml'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Override version label (org.opencontainers.image.version)'
+        required: false
+        default: ''
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - title: Fedora Kinoite
+            image: fedora-kinoite
+            description: Customized image of Fedora Kinoite
+            licenses: MIT
+          - title: Fedora Silverblue
+            image: fedora-silverblue
+            description: Customized image of Fedora Silverblue
+            licenses: MIT
+
+    uses: ./.github/workflows/common-build.yml
+    permissions:
+      contents: read
+      packages: write
+    with:
+      registry: ghcr.io/${{ github.repository_owner }}
+      image: ${{ matrix.image }}
+      description: ${{ matrix.image }}
+      title: ${{ matrix.image }}
+      licenses: ${{ matrix.licenses }}
+      version: ${{ inputs.version }}
+      push:  ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+    secrets: inherit

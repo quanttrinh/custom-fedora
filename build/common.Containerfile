@@ -1,21 +1,29 @@
-FROM quay.io/fedora/fedora-kinoite:latest
+ARG VARIANT
+ARG IMAGE
+ARG TAG
 
-RUN --mount=type=secret,id=cosign_pubic_key \
-    --mount=type=secret,id=add_containers_policy \
-<<EORUN
+FROM ${IMAGE}:${TAG}
+
+ARG VARIANT
+ENV VARIANT=${VARIANT}
+
+COPY --from=shared / /var/shared/
+COPY --from=scripts / /var/scripts/
+
+RUN <<EORUN
 set -xeuo pipefail
 
-mkdir -p /etc/pki/containers
-cp /run/secrets/cosign_pubic_key /etc/pki/containers/ghcr.io-quanttrinh-fedora-kinoite.pub
-restorecon -RFv /etc/pki/containers
+chmod a+x /var/scripts/add_containers_policy.sh
+/var/scripts/add_containers_policy.sh "$VARIANT"
 
-cp /run/secrets/add_containers_policy ./
-chmod a+x add_containers_policy
-./add_containers_policy
-rm add_containers_policy
+mkdir -p /etc/pki/containers
+cp /var/shared/keys/pki/ghcr.io-quanttrinh-custom-fedora.pub /etc/pki/containers/ghcr.io-quanttrinh-custom-fedora.pub
+
+restorecon -RFv /etc/pki
+restorecon -RFv /etc/containers
 
 cat /etc/containers/policy.json
-cat /etc/containers/registries.d/ghcr.io-quanttrinh-fedora-kinoite.yaml
+cat /etc/containers/registries.d/ghcr.io-quanttrinh.yaml
 
 dnf install -y \
 https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm \
@@ -75,7 +83,7 @@ gstreamer1-plugin-openh264 \
 gstreamer1-libav \
 gstreamer1-vaapi \
 gstreamer1-svt-hevc
-dnf install lame* --exclude=lame-devel
+dnf install -y lame* --exclude=lame-devel
 dnf group install -y --setopt="install_weak_deps=False" --exclude=PackageKit-gstreamer-plugin --exclude=vlc-plugins-freeworld multimedia
 
 systemctl disable NetworkManager-wait-online.service
