@@ -1,7 +1,22 @@
 FROM quay.io/fedora/fedora-kinoite:latest
 
-RUN <<EORUN
+RUN --mount=type=secret,id=cosign_pubic_key \
+    --mount=type=secret,id=add_containers_policy \
+<<EORUN
 set -xeuo pipefail
+
+mkdir -p /etc/pki/containers
+cp /run/secrets/cosign_pubic_key /etc/pki/containers/ghcr.io-quanttrinh-fedora-kinoite.pub
+restorecon -RFv /etc/pki/containers
+
+cp /run/secrets/add_containers_policy ./
+chmod a+x add_containers_policy
+./add_containers_policy
+rm add_containers_policy
+
+cat /etc/containers/policy.json
+cat /etc/containers/registries.d/ghcr.io-quanttrinh-fedora-kinoite.yaml
+
 dnf install -y \
 https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm \
 https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm

@@ -125,8 +125,10 @@ jobs:
           --annotation org.opencontainers.image.description="${{ env.OCI_DESCRIPTION }}" \
           --annotation org.opencontainers.image.source="${{ github.server_url }}/${{ github.repository }}" \
           --annotation org.opencontainers.image.licenses="${{ env.OCI_LICENSE }}" \
+          --secret=id=cosign_pubic_key,src=shared/keys/ghcr.io-quanttrinh-fedora-kinoite.pub \
+          --secret=id=add_containers_policy,src=scripts/add_containers_policy.sh \
           -t ${{ env.IMAGE_NAME }}:build \
-          ${{ env.IMAGE_NAME }}
+          .
         working-directory: ${{ github.workspace }}
 
       - name: Rechunk container image
@@ -137,10 +139,13 @@ jobs:
             --from localhost/${{ env.IMAGE_NAME }}:build \
             --output containers-storage:localhost/${{ env.IMAGE_NAME }}:rechunked
 
-      - name: Build container image
+      - name: Create NOP Containerfile
+        run: echo "FROM localhost/${{ env.IMAGE_NAME }}:rechunked" > ${{ env.IMAGE_NAME }}/Containerfile.NOP
+
+      - name: Relabel container image
         run: |
           buildah build \
-          --from localhost/${{ env.IMAGE_NAME }}:rechunked \
+          -f ${{ env.IMAGE_NAME }}/Containerfile.NOP \
           --format oci \
           --tls-verify=true \
           --layers=true \
