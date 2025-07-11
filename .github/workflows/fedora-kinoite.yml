@@ -139,10 +139,13 @@ jobs:
             --from localhost/${{ env.IMAGE_NAME }}:build \
             --output containers-storage:localhost/${{ env.IMAGE_NAME }}:rechunked
 
-      - name: Build container image
+      - name: Create NOP Containerfile
+        run: echo "FROM localhost/${{ env.IMAGE_NAME }}:rechunked" > ${{ env.IMAGE_NAME }}/Containerfile.NOP
+
+      - name: Relabel container image
         run: |
           buildah build \
-          --from localhost/${{ env.IMAGE_NAME }}:rechunked \
+          -f ${{ env.IMAGE_NAME }}/Containerfile.NOP \
           --format oci \
           --tls-verify=true \
           --layers=true \
