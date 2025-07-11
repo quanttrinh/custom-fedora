@@ -1,0 +1,214 @@
+# Based on https://github.com/travier/fedora-kinoite/blob/main/.github/workflows/fedora-kinoite.yml
+
+name: "Build Fedora image"
+
+on:
+  workflow_call:
+    inputs:
+      registry:
+        required: true
+        type: string
+      image:
+        required: true
+        type: string
+      description:
+        required: false
+        type: string
+        default: Customized image of Fedora
+      title:
+        required: false
+        type: string
+        default: Fedora
+      licenses:
+        required: false
+        type: string
+        default: MIT
+      version:
+        required: false
+        type: string
+      push:
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  build-image:
+    runs-on: ubuntu-latest
+
+    container: 
+      image: quay.io/containers/podman
+      options: --privileged --volume /:/run/host:rw --user 0:0
+
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      digest: ${{ steps.push.outputs.digest }}
+      registry: ${{ inputs.registry }}
+      image: ${{ inputs.image }}
+
+    steps:
+      - name: Downcase REGISTRY
+        run: |
+          echo "REGISTRY=${REGISTRY,,}" >> ${GITHUB_ENV}
+
+      - name: Reclaim disk space
+        run: |
+          set -euxo pipefail
+          rm -rf \
+          /run/host/usr/share/dotnet \
+          /run/host/usr/local/lib/android \
+          /run/host/opt/ghc \
+          /run/host/opt/hostedtoolcache/CodeQL \
+          /run/host/usr/local/share/boost
+
+      - name: Install prereqs
+        run: |
+          set -euxo pipefail
+          dnf upgrade -y --refresh
+          dnf install -y buildah skopeo rpm-ostree jq --exclude container-selinux
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Add missing .docker folder
+        run: |
+          mkdir -p /github/home/.docker/
+
+      - name: Login to Container Registry
+        uses: redhat-actions/podman-login@v1
+        if: inputs.push
+        with:
+          registry: ${{ inputs.registry }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          auth_file_path: /tmp/auth.json
+
+      - name: Figure out version
+        id: version
+        run: |
+          set -exo pipefail
+          if [[ -n ${VERSION_OVERRIDE} ]]; then
+            version_base="${VERSION_OVERRIDE}"
+          else
+            version_base="$(skopeo inspect docker://quay.io/fedora/${{ inputs.image }}:latest | jq -r '.Labels."org.opencontainers.image.version"')"
+          fi
+          build_date="$(date -u +"%Y%m%dT%H%M%SZ")"
+          tag="${version_base}-${build_date}"
+          version="${version_base}+${build_date}"
+          echo "Base version: ${version_base}"
+          echo "tag=${tag,,}" >> "$GITHUB_OUTPUT"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+        env:
+          VERSION_OVERRIDE: ${{ inputs.version }}
+
+      - name: Build container image (Common)
+        run: |
+          buildah build \
+          -f common.Containerfile \
+          --build-arg VARIANT="${{ inputs.image }}" \
+          --build-arg IMAGE="quay.io/fedora/${{ inputs.image }}" \
+          --build-arg TAG="latest" \
+          --format oci \
+          --tls-verify=true \
+          --layers=true \
+          --label org.opencontainers.image.version="${{ steps.version.outputs.version }}" \
+          --label org.opencontainers.image.title="${{ inputs.title }}" \
+          --label org.opencontainers.image.description="${{ inputs.description }}" \
+          --label org.opencontainers.image.source="${{ github.server_url }}/${{ github.repository }}" \
+          --label org.opencontainers.image.licenses="${{ inputs.licenses }}" \
+          --annotation org.opencontainers.image.version="${{ steps.version.outputs.version }}" \
+          --annotation org.opencontainers.image.title="${{ inputs.title }}" \
+          --annotation org.opencontainers.image.description="${{ inputs.description }}" \
+          --annotation org.opencontainers.image.source="${{ github.server_url }}/${{ github.repository }}" \
+          --annotation org.opencontainers.image.licenses="${{ inputs.licenses }}" \
+          --build-context shared=shared \
+          --build-context scripts=scripts \
+          -t ${{ inputs.image }}:build \
+          build
+        working-directory: ${{ github.workspace }}
+
+      - name: Build container image (Specialized)
+        run: |
+          buildah build \
+          -f ${{ inputs.image }}.Containerfile \
+          --build-arg IMAGE="localhost/${{ inputs.image }}" \
+          --build-arg TAG="build" \
+          --format oci \
+          --tls-verify=true \
+          --layers=true \
+          --label org.opencontainers.image.version="${{ steps.version.outputs.version }}" \
+          --label org.opencontainers.image.title="${{ inputs.title }}" \
+          --label org.opencontainers.image.description="${{ inputs.description }}" \
+          --label org.opencontainers.image.source="${{ github.server_url }}/${{ github.repository }}" \
+          --label org.opencontainers.image.licenses="${{ inputs.licenses }}" \
+          --annotation org.opencontainers.image.version="${{ steps.version.outputs.version }}" \
+          --annotation org.opencontainers.image.title="${{ inputs.title }}" \
+          --annotation org.opencontainers.image.description="${{ inputs.description }}" \
+          --annotation org.opencontainers.image.source="${{ github.server_url }}/${{ github.repository }}" \
+          --annotation org.opencontainers.image.licenses="${{ inputs.licenses }}" \
+          --build-context shared=shared \
+          --build-context scripts=scripts \
+          -t ${{ inputs.image }}:build2 \
+          build
+        working-directory: ${{ github.workspace }}
+
+      - name: Rechunk container image
+        run: |
+          rpm-ostree compose build-chunked-oci \
+            --bootc --format-version=1 \
+            --max-layers 96 \
+            --from localhost/${{ inputs.image }}:build2 \
+            --output containers-storage:localhost/${{ inputs.image }}:rechunked
+
+      - name: Create NOP Containerfile
+        run: echo "FROM localhost/${{ inputs.image }}:rechunked" > ${{ inputs.image }}.NOP.Containerfile
+        working-directory: ${{ github.workspace }}/build
+
+      - name: Relabel container image
+        run: |
+          buildah build \
+          -f ${{ inputs.image }}.NOP.Containerfile \
+          --format oci \
+          --tls-verify=true \
+          --layers=true \
+          --label org.opencontainers.image.version="${{ steps.version.outputs.version }}" \
+          --label org.opencontainers.image.title="${{ inputs.title }}" \
+          --label org.opencontainers.image.description="${{ inputs.description }}" \
+          --label org.opencontainers.image.source="${{ github.server_url }}/${{ github.repository }}" \
+          --label org.opencontainers.image.licenses="${{ inputs.licenses }}" \
+          --annotation org.opencontainers.image.version="${{ steps.version.outputs.version }}" \
+          --annotation org.opencontainers.image.title="${{ inputs.title }}" \
+          --annotation org.opencontainers.image.description="${{ inputs.description }}" \
+          --annotation org.opencontainers.image.source="${{ github.server_url }}/${{ github.repository }}" \
+          --annotation org.opencontainers.image.licenses="${{ inputs.licenses }}" \
+          -t ${{ inputs.image }}:latest \
+          -t ${{ inputs.image }}:${{ steps.version.outputs.tag }} \
+          build
+        working-directory: ${{ github.workspace }}
+
+      - name: Push to Container Registry
+        uses: redhat-actions/push-to-registry@v2
+        id: push
+        if: inputs.push
+        with:
+          registry: ${{ inputs.registry }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          image: ${{ inputs.image }}
+          tags: latest ${{ steps.version.outputs.tag }}
+          extra-args: |
+            --compression-format=zstd
+
+  sign-published-image:
+    uses: ./.github/workflows/common-signing.yml
+    needs: [build-image]
+    permissions:
+      packages: write
+    if: inputs.push
+    with:
+      digest: ${{ needs.build-image.outputs.digest }}
+      registry: ${{ needs.build-image.outputs.registry }}
+      image: ${{ needs.build-image.outputs.image }}
+    secrets: inherit
