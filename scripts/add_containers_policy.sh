@@ -8,7 +8,27 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
+POLICY_FILE=/etc/containers/policy.json
 mkdir -p /etc/containers/
+if [ ! -s "$POLICY_FILE" ]; then
+    echo "$POLICY_FILE does not exist, generating default..."
+    cat <<EOF > "$POLICY_FILE"
+{
+    "default": [
+        {
+            "type": "reject"
+        }
+    ],
+    "transports":
+        {
+            "docker-daemon":
+                {
+                    "": [{"type":"insecureAcceptAnything"}]
+                }
+        }
+}
+EOF
+fi
 jq '
 . + {
   transports: (
@@ -29,7 +49,7 @@ jq '
     }
   )
 }
-' /etc/containers/policy.json > /etc/containers/policy.json
+' "$POLICY_FILE" > "$POLICY_FILE"
 
 mkdir -p /etc/containers/registries.d
 cat <<EOF > /etc/containers/registries.d/ghcr.io-quanttrinh-fedora-kinoite.yaml
