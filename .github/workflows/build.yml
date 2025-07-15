@@ -23,10 +23,11 @@ on:
       - '.github/workflows/common-signing.yml'
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Override version label (org.opencontainers.image.version)'
+      push:
+        description: 'Push built images to registry'
         required: false
-        default: ''
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -56,6 +57,5 @@ jobs:
       description: ${{ matrix.description }}
       title: ${{ matrix.title }}
       licenses: ${{ matrix.licenses }}
-      version: ${{ inputs.version }}
-      push:  ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+      push:  ${{ inputs.push || ( github.event_name != 'pull_request' && github.ref == 'refs/heads/main' ) }}
     secrets: inherit

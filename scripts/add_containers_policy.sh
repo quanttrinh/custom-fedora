@@ -72,4 +72,8 @@ docker:
     ghcr.io/quanttrinh:
         use-sigstore-attachments: true
 EOF
-restorecon -RFv /etc/containers/registries.d/ghcr.io-quanttrinh.yaml
+
+cat /etc/containers/policy.json
+cat /etc/containers/registries.d/ghcr.io-quanttrinh.yaml
+
+restorecon -RFv /etc/containers

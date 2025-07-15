@@ -1,4 +1,5 @@
 # Based on https://github.com/travier/fedora-kinoite/blob/main/.github/workflows/fedora-kinoite.yml
+# Based on https://github.com/hhd-dev/rechunk/blob/master/.github/workflows/online_test_deck.yml
 
 name: "Build Fedora image"
 
@@ -23,9 +24,6 @@ on:
         required: false
         type: string
         default: MIT
-      version:
-        required: false
-        type: string
       push:
         required: false
         type: boolean
@@ -34,10 +32,6 @@ on:
 jobs:
   build-image:
     runs-on: ubuntu-latest
-
-    container: 
-      image: quay.io/containers/podman
-      options: --privileged --volume /:/run/host:rw --user 0:0
 
     permissions:
       contents: read
@@ -55,151 +49,163 @@ jobs:
 
       - name: Reclaim disk space
         run: |
-          set -euxo pipefail
-          rm -rf \
-          /run/host/usr/share/dotnet \
-          /run/host/usr/local/lib/android \
-          /run/host/opt/ghc \
-          /run/host/opt/hostedtoolcache/CodeQL \
-          /run/host/usr/local/share/boost
-
-      - name: Install prereqs
-        run: |
-          set -euxo pipefail
-          dnf upgrade -y --refresh
-          dnf install -y buildah skopeo rpm-ostree jq --exclude container-selinux
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /usr/local/lib/android \
+            /opt/ghc \
+            /opt/hostedtoolcache/CodeQL \
+            /usr/local/share/boost
 
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Add missing .docker folder
-        run: |
-          mkdir -p /github/home/.docker/
-
       - name: Login to Container Registry
-        uses: redhat-actions/podman-login@v1
-        if: inputs.push
-        with:
-          registry: ${{ inputs.registry }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-          auth_file_path: /tmp/auth.json
+        run: |
+          sudo -E podman secret create --env=true github_token GITHUB_TOKEN
+          sudo podman login \
+            --username=${{ github.actor }} \
+            --secret=github_token \
+            ${{ inputs.registry }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Figure out version
         id: version
         run: |
           set -exo pipefail
-          if [[ -n ${VERSION_OVERRIDE} ]]; then
-            version_base="${VERSION_OVERRIDE}"
-          else
-            version_base="$(skopeo inspect docker://quay.io/fedora/${{ inputs.image }}:latest | jq -r '.Labels."org.opencontainers.image.version"')"
-          fi
-          build_date="$(date -u +"%Y%m%dT%H%M%SZ")"
-          tag="${version_base}-${build_date}"
-          version="${version_base}+${build_date}"
-          echo "Base version: ${version_base}"
-          echo "tag=${tag,,}" >> "$GITHUB_OUTPUT"
-          echo "version=${version}" >> "$GITHUB_OUTPUT"
-        env:
-          VERSION_OVERRIDE: ${{ inputs.version }}
+
+          build_date="$(date -u +"%Y%m%d%H%M%S")"
+
+          base_version="$(sudo skopeo inspect docker://quay.io/fedora/${{ inputs.image }}:latest | jq -r '.Labels."org.opencontainers.image.version"')"
+
+          meta_version="r${build_date}"
+          final_tag="${base_version}-${meta_version}"
+          final_version="${base_version}+${meta_version}"
+          
+          echo "base_version=${base_version}" >> "$GITHUB_OUTPUT"
+          echo "major_version=${base_version%%.*}" >> "$GITHUB_OUTPUT"
+          echo "final_tag=${final_tag,,}" >> "$GITHUB_OUTPUT"
+          echo "final_version=${final_version}" >> "$GITHUB_OUTPUT"
+          echo "meta_version=${meta_version}" >> "$GITHUB_OUTPUT"
 
       - name: Build container image (Common)
+        id: build1
         run: |
-          buildah build \
-          -f common.Containerfile \
+          set -exo pipefail
+
+          build_ref=containers-storage:localhost/${{ inputs.image }}-build:latest
+
+          sudo buildah build \
+          --file common.Containerfile \
           --build-arg VARIANT="${{ inputs.image }}" \
           --build-arg IMAGE="quay.io/fedora/${{ inputs.image }}" \
           --build-arg TAG="latest" \
           --format oci \
           --tls-verify=true \
           --layers=true \
-          --label org.opencontainers.image.version="${{ steps.version.outputs.version }}" \
-          --label org.opencontainers.image.title="${{ inputs.title }}" \
-          --label org.opencontainers.image.description="${{ inputs.description }}" \
-          --label org.opencontainers.image.source="${{ github.server_url }}/${{ github.repository }}" \
-          --label org.opencontainers.image.licenses="${{ inputs.licenses }}" \
-          --annotation org.opencontainers.image.version="${{ steps.version.outputs.version }}" \
-          --annotation org.opencontainers.image.title="${{ inputs.title }}" \
-          --annotation org.opencontainers.image.description="${{ inputs.description }}" \
-          --annotation org.opencontainers.image.source="${{ github.server_url }}/${{ github.repository }}" \
-          --annotation org.opencontainers.image.licenses="${{ inputs.licenses }}" \
           --build-context shared=shared \
           --build-context scripts=scripts \
-          -t ${{ inputs.image }}:build \
+          --tag ${build_ref} \
           build
+
+          echo "build_ref=${build_ref}" >> "$GITHUB_OUTPUT"
         working-directory: ${{ github.workspace }}
 
       - name: Build container image (Specialized)
+        id: build2
         run: |
-          buildah build \
-          -f ${{ inputs.image }}.Containerfile \
-          --build-arg IMAGE="localhost/${{ inputs.image }}" \
-          --build-arg TAG="build" \
+          set -exo pipefail
+
+          build_ref=containers-storage:localhost/${{ inputs.image }}-build:latest
+          prev_build_ref=${{ steps.build1.outputs.build_ref }}
+          prev_build_ref=${prev_build_ref#containers-storage:}
+
+          sudo buildah build \
+          --file ${{ inputs.image }}.Containerfile \
+          --build-arg IMAGE="${prev_build_ref%%:*}" \
+          --build-arg TAG="${prev_build_ref##*:}" \
           --format oci \
           --tls-verify=true \
           --layers=true \
-          --label org.opencontainers.image.version="${{ steps.version.outputs.version }}" \
-          --label org.opencontainers.image.title="${{ inputs.title }}" \
-          --label org.opencontainers.image.description="${{ inputs.description }}" \
-          --label org.opencontainers.image.source="${{ github.server_url }}/${{ github.repository }}" \
-          --label org.opencontainers.image.licenses="${{ inputs.licenses }}" \
-          --annotation org.opencontainers.image.version="${{ steps.version.outputs.version }}" \
-          --annotation org.opencontainers.image.title="${{ inputs.title }}" \
-          --annotation org.opencontainers.image.description="${{ inputs.description }}" \
-          --annotation org.opencontainers.image.source="${{ github.server_url }}/${{ github.repository }}" \
-          --annotation org.opencontainers.image.licenses="${{ inputs.licenses }}" \
           --build-context shared=shared \
           --build-context scripts=scripts \
-          -t ${{ inputs.image }}:build2 \
+          --tag ${build_ref} \
           build
+
+          echo "build_ref=${build_ref}" >> "$GITHUB_OUTPUT"
         working-directory: ${{ github.workspace }}
 
-      - name: Rechunk container image
-        run: |
-          rpm-ostree compose build-chunked-oci \
-            --bootc --format-version=1 \
-            --max-layers 96 \
-            --from localhost/${{ inputs.image }}:build2 \
-            --output containers-storage:localhost/${{ inputs.image }}:rechunked
+      - name: Run Rechunker
+        id: rechunk
+        uses: hhd-dev/rechunk@master
+        with:
+          ref: ${{ steps.build2.outputs.build_ref }}
+          prev-ref: ${{ inputs.registry }}/${{ inputs.image }}:latest
+          rechunk: ghcr.io/hhd-dev/rechunk:latest
+          version: ${{ steps.version.outputs.final_version }}
+          revision: ${{ github.sha }}
+          pretty: ${{ steps.version.outputs.base_version }} (${{ steps.version.outputs.meta_version }})
+          git: ${{ github.workspace }}
+          keep-ref: true
+          labels: |
+            org.opencontainers.image.created=<timestamp>
+            org.opencontainers.image.licenses=${{ inputs.licenses }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.title=${{ inputs.title }}
+            org.opencontainers.image.url=${{ github.server_url }}/${{ github.repository }}
+          description: >
+            ${{ inputs.title }} <pretty>
+            [Kernel: <relver:kernel>,
+            Mesa: <version:mesa>,
+            SystemD: <version:systemd>]
+          changelog: |
+            #  Fedora Kinoite <pretty>
+            ## Version: <version>
+            Major Components:
+              - Kernel: <relver:kernel>
+              - Mesa: <version:mesa-dri-drivers>
+              - SystemD: <version:systemd>
+            ## Changes since last version (<previous>):
+            ### Commits
+            <commits>
+            ### Package Changes:
+            <pkgupd>
+          formatters: |
+            commits.none=No changes\n
+            commits.commit=- **[<short>](${{ github.server_url }}/${{ github.repository }}/commit/<hash>)** <subject>\n
+            pkgupd.none=No package updates\n
+            pkgupd.add=- **<package>** Added at <new>\n
+            pkgupd.update=- **<package>** <old> → <new>\n
+            pkgupd.remove=- **<package>** <old> → Removed\n
 
-      - name: Create NOP Containerfile
-        run: echo "FROM localhost/${{ inputs.image }}:rechunked" > ${{ inputs.image }}.NOP.Containerfile
-        working-directory: ${{ github.workspace }}/build
+      - name: Upload Changelog
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.image }}_changelog.md
+          path: ${{ steps.rechunk.outputs.changelog }}
+          compression-level: 0
 
-      - name: Relabel container image
-        run: |
-          buildah build \
-          -f ${{ inputs.image }}.NOP.Containerfile \
-          --format oci \
-          --tls-verify=true \
-          --layers=true \
-          --label org.opencontainers.image.version="${{ steps.version.outputs.version }}" \
-          --label org.opencontainers.image.title="${{ inputs.title }}" \
-          --label org.opencontainers.image.description="${{ inputs.description }}" \
-          --label org.opencontainers.image.source="${{ github.server_url }}/${{ github.repository }}" \
-          --label org.opencontainers.image.licenses="${{ inputs.licenses }}" \
-          --annotation org.opencontainers.image.version="${{ steps.version.outputs.version }}" \
-          --annotation org.opencontainers.image.title="${{ inputs.title }}" \
-          --annotation org.opencontainers.image.description="${{ inputs.description }}" \
-          --annotation org.opencontainers.image.source="${{ github.server_url }}/${{ github.repository }}" \
-          --annotation org.opencontainers.image.licenses="${{ inputs.licenses }}" \
-          -t ${{ inputs.image }}:latest \
-          -t ${{ inputs.image }}:${{ steps.version.outputs.tag }} \
-          build
-        working-directory: ${{ github.workspace }}
+      - name: Upload Skopeo Manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.image }}_manifest.json
+          path: ${{ steps.rechunk.outputs.manifest }}
+          compression-level: 0
 
       - name: Push to Container Registry
-        uses: redhat-actions/push-to-registry@v2
         id: push
         if: inputs.push
-        with:
-          registry: ${{ inputs.registry }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-          image: ${{ inputs.image }}
-          tags: latest ${{ steps.version.outputs.tag }}
-          extra-args: |
-            --compression-format=zstd
+        shell: bash
+        run: |
+          set -exo pipefail
+
+          digest="$(sudo skopeo inspect ${{ steps.rechunk.outputs.ref }} | jq -r '.Digest')"
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+
+          for tag in "latest" "${{ steps.version.major_version }}" "${{ steps.version.final_tag }}"; do
+            sudo skopeo copy ${{ steps.rechunk.outputs.ref }} docker://${{ inputs.registry }}/${{ inputs.image }}:${tag}
+          done
+
 
   sign-published-image:
     uses: ./.github/workflows/common-signing.yml
