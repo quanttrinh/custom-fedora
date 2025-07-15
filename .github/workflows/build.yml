@@ -40,10 +40,12 @@ jobs:
         include:
           - title: Fedora Kinoite
             image: fedora-kinoite
+            variant: kinoite
             description: Customized image of Fedora Kinoite
             licenses: MIT
           - title: Fedora Silverblue
             image: fedora-silverblue
+            variant: silverblue
             description: Customized image of Fedora Silverblue
             licenses: MIT
 
@@ -54,8 +56,9 @@ jobs:
     with:
       registry: ghcr.io/${{ github.repository_owner }}
       image: ${{ matrix.image }}
+      variant: ${{ matrix.variant }}
       description: ${{ matrix.description }}
       title: ${{ matrix.title }}
       licenses: ${{ matrix.licenses }}
-      push:  ${{ inputs.push || ( github.event_name != 'pull_request' && github.ref == 'refs/heads/main' ) }}
+      push: ${{ inputs.push || ( github.event_name != 'pull_request' && github.ref == 'refs/heads/main' ) }}
     secrets: inherit

@@ -19,7 +19,7 @@ for arg in "$@"; do
     ;;
   --help|-h)
     echo "Usage: $0 --variant=<variant> --extra-kargs=<kargs>"
-    echo "Where <variant> is either 'fedora-kinoite' or 'fedora-silverblue'"
+    echo "Where <variant> is either 'kinoite' or 'silverblue'"
     echo "Where <kargs> is extra kernel parameters to be added"
     exit 0
     ;;
@@ -30,9 +30,9 @@ for arg in "$@"; do
   esac
 done
 
-if [[ "$VARIANT" != "fedora-kinoite" && "$VARIANT" != "fedora-silverblue" ]]; then
+if [[ "$VARIANT" != "kinoite" && "$VARIANT" != "silverblue" ]]; then
   echo "Usage: $0 --variant=<variant> --extra-kargs=<kargs>" >&2
-  echo "Where <variant> is either 'fedora-kinoite' or 'fedora-silverblue'" >&2
+  echo "Where <variant> is either 'kinoite' or 'silverblue'" >&2
   echo "Where <kargs> is extra kernel parameters to be added" >&2
   exit 1
 fi
