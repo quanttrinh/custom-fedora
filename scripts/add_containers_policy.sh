@@ -9,9 +9,9 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 VARIANT=$1
-if [[ "$VARIANT" != "fedora-kinoite" && "$VARIANT" != "fedora-silverblue" ]]; then
+if [[ "$VARIANT" != "kinoite" && "$VARIANT" != "silverblue" ]]; then
   echo "Usage: $0 <variant>" >&2
-  echo "Where <variant> is either 'fedora-kinoite' or 'fedora-silverblue'" >&2
+  echo "Where <variant> is either 'kinoite' or 'silverblue'" >&2
   exit 1
 fi
 echo "Selected variant: $VARIANT"

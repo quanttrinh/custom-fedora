@@ -1,0 +1,68 @@
+name: "Build ISO for Fedora images"
+
+on:
+  workflow_call:
+    inputs:
+      image_name:
+        required: true
+        type: string
+      image_repo:
+        required: true
+        type: string
+      image_tag:
+        required: true
+        type: string
+      version:
+        required: true
+        type: string
+      variant:
+        required: true
+        type: string
+      iso_name:
+        required: true
+        type: string
+      image_signed:
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  build-iso:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          - arch: x86_64
+
+    steps:
+    - name: Build ISO
+      uses: jasonn3/build-container-installer@main
+      id: iso
+      with:
+        arch: ${{ matrix.arch }}
+        enable_cache_dnf: true
+        enable_cache_skopeo: true
+        enable_flatpak_dependencies: true
+        enrollment_password: "qtcustomfedora"
+        secure_boot_key_url: ""
+        flatpak_remote_refs: ""
+        image_name: ${{ inputs.image_name }}
+        image_repo: ${{ inputs.image_repo }}
+        image_tag:  ${{ inputs.image_tag }}
+        image_signed: ${{ inputs.image_signed }}
+        version: ${{ inputs.version }}
+        variant: ${{ inputs.variant }}
+        iso_name: ${{ inputs.iso_name }}
+        web_ui: true
+
+    - name: Upload ISO
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ steps.iso.outputs.iso_name }}
+        path: |
+          ${{ steps.iso.outputs.iso_path }}
+          ${{ steps.iso.outputs.iso_path }}-CHECKSUM
+        if-no-files-found: error
+        retention-days: 0
+        compression-level: 0
