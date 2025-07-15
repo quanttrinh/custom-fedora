@@ -202,7 +202,7 @@ jobs:
           digest="$(sudo skopeo inspect ${{ steps.rechunk.outputs.ref }} | jq -r '.Digest')"
           echo "digest=${digest}" >> "$GITHUB_OUTPUT"
 
-          for tag in "latest" "${{ steps.version.major_version }}" "${{ steps.version.final_tag }}"; do
+          for tag in "latest" "${{ steps.version.outputs.major_version }}" "${{ steps.version.outputs.final_tag }}"; do
             sudo skopeo copy ${{ steps.rechunk.outputs.ref }} docker://${{ inputs.registry }}/${{ inputs.image }}:${tag}
           done
 
