@@ -74,5 +74,5 @@ if [[ -n "${KARGS//[[:space:]]/}" ]]; then
       wget -q "https://raw.githubusercontent.com/quanttrinh/custom-fedora/main/scripts/setup_kargs_helper.sh" -O "$FILE"
       chmod +x "$FILE"
   fi
-  ./"$FILE" "$KARGS"
+  ./"$FILE" $KARGS
 fi
