@@ -156,7 +156,7 @@ jobs:
           description: >
             ${{ inputs.title }} <pretty>
             [Kernel: <relver:kernel>,
-            Mesa: <version:mesa>,
+            Mesa: <version:mesa-dri-drivers>,
             SystemD: <version:systemd>]
           changelog: |
             #  Fedora Kinoite <pretty>
