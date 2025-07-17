@@ -3,14 +3,13 @@ ARG TAG
 
 FROM ${IMAGE}:${TAG}
 
-COPY --from=system_files /common /var/system_files/common
+COPY --from=system_files /common/* /
 COPY --from=scripts /shared /var/scripts/shared
 COPY --from=scripts /common /var/scripts/common
 
 RUN \
   set -xeuo pipefail; \
   chmod a+x /var/scripts/*; \
-  mv /var/system_files/common/* /; \
   /var/scripts/common/setup_yum_repos.sh; \
   /var/scripts/common/install_software.sh; \
   /var/scripts/common/install_multimedia.sh; \
