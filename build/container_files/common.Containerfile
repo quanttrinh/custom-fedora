@@ -3,7 +3,7 @@ ARG TAG
 
 FROM ${IMAGE}:${TAG}
 
-COPY --from=system_files /common/* /
+COPY --from=system_files /common /
 COPY --from=scripts /shared /var/scripts/shared
 COPY --from=scripts /common /var/scripts/common
 

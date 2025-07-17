@@ -67,5 +67,3 @@ jq '
 mv "$POLICY_FILE-tmp" "$POLICY_FILE"
 
 cat /etc/containers/policy.json
-
-restorecon -RFv /etc/containers
