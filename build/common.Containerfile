@@ -9,7 +9,6 @@ COPY --from=scripts /common /var/scripts/common
 
 RUN \
   set -xeuo pipefail; \
-  chmod a+x /var/scripts/*; \
   /var/scripts/common/setup_yum_repos.sh; \
   /var/scripts/common/install_software.sh; \
   /var/scripts/common/install_multimedia.sh; \
