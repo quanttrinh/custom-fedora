@@ -111,7 +111,6 @@ jobs:
 
           sudo buildah build \
           --file common.Containerfile \
-          --build-arg VARIANT="${{ inputs.variant }}" \
           --build-arg IMAGE="quay.io/fedora/${{ inputs.image }}" \
           --build-arg TAG="latest" \
           --format oci \
