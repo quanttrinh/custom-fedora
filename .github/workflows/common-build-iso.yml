@@ -49,12 +49,11 @@ jobs:
         flatpak_remote_refs: ""
         image_name: ${{ inputs.image_name }}
         image_repo: ${{ inputs.image_repo }}
-        image_tag:  ${{ inputs.image_tag }}
+        image_tag: ${{ inputs.image_tag }}
         image_signed: ${{ inputs.image_signed }}
         version: ${{ inputs.version }}
         variant: ${{ inputs.variant }}
         iso_name: ${{ inputs.iso_name }}
-        web_ui: true
 
     - name: Upload ISO
       uses: actions/upload-artifact@v4
