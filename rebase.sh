@@ -42,14 +42,14 @@ echo "Extra kargs: $KARGS"
 
 # Download container policy public key
 echo "Downloading public key..."
-wget -q "https://raw.githubusercontent.com/quanttrinh/custom-fedora/main/shared/pki/ghcr.io-quanttrinh-custom-fedora.pub" \
+wget -q "https://raw.githubusercontent.com/quanttrinh/custom-fedora/main/system_files/common/etc/pki/containers/ghcr.io-quanttrinh-custom-fedora.pub" \
      -O /etc/pki/containers/ghcr.io-quanttrinh-custom-fedora.pub
 
 # Check and download policy script
-FILE="scripts/add_containers_policy.sh"
+FILE="scripts/shared/add_containers_policy.sh"
 if [ ! -f "$FILE" ]; then
     echo "$FILE does not exist, downloading..."
-    wget -q "https://raw.githubusercontent.com/quanttrinh/custom-fedora/main/scripts/add_containers_policy.sh" -O "$FILE"
+    wget -q "https://raw.githubusercontent.com/quanttrinh/custom-fedora/main/scripts/shared/add_containers_policy.sh" -O "$FILE"
     chmod +x "$FILE"
 fi
 
@@ -68,10 +68,10 @@ rpm-ostree rebase ostree-image-signed:registry:ghcr.io/quanttrinh/$VARIANT:lates
 
 # Check and download kargs setup helper script
 if [[ -n "${KARGS//[[:space:]]/}" ]]; then
-  FILE="scripts/setup_kargs_helper.sh"
+  FILE="scripts/misc/setup_kargs_helper.sh"
   if [ ! -f "$FILE" ]; then
       echo "$FILE does not exist, downloading..."
-      wget -q "https://raw.githubusercontent.com/quanttrinh/custom-fedora/main/scripts/setup_kargs_helper.sh" -O "$FILE"
+      wget -q "https://raw.githubusercontent.com/quanttrinh/custom-fedora/main/scripts/misc/setup_kargs_helper.sh" -O "$FILE"
       chmod +x "$FILE"
   fi
   ./"$FILE" $KARGS
