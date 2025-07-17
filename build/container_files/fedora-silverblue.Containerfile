@@ -3,7 +3,7 @@ ARG TAG
 
 FROM ${IMAGE}:${TAG}
 
-COPY --from=system_files /silverblue/* /
+COPY --from=system_files /silverblue /
 COPY --from=scripts /shared /var/scripts/shared
 COPY --from=scripts /silverblue /var/scripts/silverblue
 

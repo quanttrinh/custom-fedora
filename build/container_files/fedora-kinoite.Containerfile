@@ -3,7 +3,7 @@ ARG TAG
 
 FROM ${IMAGE}:${TAG}
 
-COPY --from=system_files /kinoite/* /
+COPY --from=system_files /kinoite /
 COPY --from=scripts /shared /var/scripts/shared
 COPY --from=scripts /kinoite /var/scripts/kinoite
 
