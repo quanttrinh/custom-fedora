@@ -9,6 +9,5 @@ COPY --from=scripts /kinoite /var/scripts/kinoite
 
 RUN \
   set -xeuo pipefail; \
-  chmod a+x /var/scripts/*; \
   /var/scripts/shared/add_containers_policy.sh kinoite; \
   /var/scripts/shared/ostree_commit.sh;

@@ -9,6 +9,5 @@ COPY --from=scripts /silverblue /var/scripts/silverblue
 
 RUN \
   set -xeuo pipefail; \
-  chmod a+x /var/scripts/*; \
   /var/scripts/shared/add_containers_policy.sh silverblue; \
   /var/scripts/shared/ostree_commit.sh;
