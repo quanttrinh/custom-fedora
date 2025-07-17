@@ -25,6 +25,32 @@ on:
         required: false
         type: boolean
         default: true
+  workflow_dispatch:
+    inputs:
+      image_name:
+        required: true
+        type: string
+        default: fedora-kinoite
+      image_tag:
+        required: true
+        type: string
+        default: 42
+      version:
+        required: true
+        type: string
+        default: 42
+      variant:
+        required: true
+        type: string
+        default: kinoite
+      iso_name:
+        required: true
+        type: string
+        default: fedora-kinoite
+      image_signed:
+        required: false
+        type: boolean
+        default: true
 
 jobs:
   build-iso:
@@ -36,6 +62,9 @@ jobs:
           - arch: x86_64
 
     steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
     - name: Build ISO
       uses: jasonn3/build-container-installer@main
       id: iso
@@ -48,13 +77,13 @@ jobs:
         secure_boot_key_url: ""
         flatpak_remote_refs: ""
         image_name: ${{ inputs.image_name }}
-        image_repo: ${{ inputs.image_repo }}
-        image_tag:  ${{ inputs.image_tag }}
+        image_repo: ${{ inputs.image_repo || format('ghcr.io/{0}', github.repository_owner) }}
+        image_tag: ${{ inputs.image_tag }}
         image_signed: ${{ inputs.image_signed }}
         version: ${{ inputs.version }}
         variant: ${{ inputs.variant }}
         iso_name: ${{ inputs.iso_name }}
-        web_ui: true
+        additional_templates: /github/workspace/build/lorax_templates/common/ui_changes.tmpl
 
     - name: Upload ISO
       uses: actions/upload-artifact@v4

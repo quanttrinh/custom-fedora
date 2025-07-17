@@ -110,7 +110,7 @@ jobs:
           build_ref=containers-storage:localhost/${{ inputs.image }}-build:latest
 
           sudo buildah build \
-          --file common.Containerfile \
+          --file build/container_files/common.Containerfile \
           --build-arg IMAGE="quay.io/fedora/${{ inputs.image }}" \
           --build-arg TAG="latest" \
           --format oci \
@@ -134,7 +134,7 @@ jobs:
           prev_build_ref=${prev_build_ref#containers-storage:}
 
           sudo buildah build \
-          --file ${{ inputs.image }}.Containerfile \
+          --file build/container_files/${{ inputs.image }}.Containerfile \
           --build-arg IMAGE="${prev_build_ref%%:*}" \
           --build-arg TAG="${prev_build_ref##*:}" \
           --format oci \
