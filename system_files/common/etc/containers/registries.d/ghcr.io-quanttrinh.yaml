@@ -1,0 +1,3 @@
+docker:
+    ghcr.io/quanttrinh:
+        use-sigstore-attachments: true

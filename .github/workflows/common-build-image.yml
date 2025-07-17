@@ -117,7 +117,7 @@ jobs:
           --format oci \
           --tls-verify=true \
           --layers=true \
-          --build-context shared=shared \
+          --build-context system_files=system_files \
           --build-context scripts=scripts \
           --tag ${build_ref} \
           build
@@ -141,7 +141,7 @@ jobs:
           --format oci \
           --tls-verify=true \
           --layers=true \
-          --build-context shared=shared \
+          --build-context system_files=system_files \
           --build-context scripts=scripts \
           --tag ${build_ref} \
           build

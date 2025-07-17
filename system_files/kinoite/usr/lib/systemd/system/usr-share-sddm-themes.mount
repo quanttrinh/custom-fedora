@@ -1,0 +1,22 @@
+# Based on Bazzite: https://github.com/ublue-os/bazzite/blob/main/system_files/desktop/kinoite/usr/lib/systemd/system/usr-share-sddm-themes.mount
+
+# Workaround to allow KDE Discover to install sddm themes
+# TODO: Remove this whenever sddm allows installing themes other than in /usr/share.
+# See https://github.com/sddm/sddm/issues/1561
+
+[Unit]
+Description=KDE writable sddm workaround
+RequiresMountsFor=/usr /var
+ConditionPathExists=/usr/share/sddm
+ConditionPathExists=/var/usrlocal/share/sddm/themes
+ConditionPathExists=/var/usrlocal/share/sddm/themes.work
+PartOf=bazzite-kde-themes-workaround.target
+
+[Mount]
+Type=overlay
+What=overlay
+Where=/usr/share/sddm/themes
+Options=lowerdir=/usr/share/sddm/themes,upperdir=/var/usrlocal/share/sddm/themes,workdir=/var/usrlocal/share/sddm/themes.work
+
+[Install]
+WantedBy=multi-user.target

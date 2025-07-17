@@ -66,14 +66,6 @@ jq '
 ' "$POLICY_FILE" > "$POLICY_FILE-tmp"
 mv "$POLICY_FILE-tmp" "$POLICY_FILE"
 
-mkdir -p /etc/containers/registries.d
-cat <<EOF > /etc/containers/registries.d/ghcr.io-quanttrinh.yaml
-docker:
-    ghcr.io/quanttrinh:
-        use-sigstore-attachments: true
-EOF
-
 cat /etc/containers/policy.json
-cat /etc/containers/registries.d/ghcr.io-quanttrinh.yaml
 
 restorecon -RFv /etc/containers
