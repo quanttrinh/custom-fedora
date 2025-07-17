@@ -41,8 +41,8 @@ jobs:
       id: iso
       with:
         arch: ${{ matrix.arch }}
-        enable_cache_dnf: true
-        enable_cache_skopeo: true
+        enable_cache_dnf: false
+        enable_cache_skopeo: false
         enable_flatpak_dependencies: true
         enrollment_password: "qtcustomfedora"
         secure_boot_key_url: ""
