@@ -93,8 +93,8 @@ jobs:
       with:
         name: ${{ steps.iso.outputs.iso_name }}
         path: |
-          ${{ steps.iso.outputs.iso_path }}
-          ${{ steps.iso.outputs.iso_path }}-CHECKSUM
+          ${{ steps.iso.outputs.iso_path }}/${{ steps.iso.outputs.iso_name }}
+          ${{ steps.iso.outputs.iso_path }}/${{ steps.iso.outputs.iso_name }}-CHECKSUM
         if-no-files-found: error
         retention-days: 0
         compression-level: 0
