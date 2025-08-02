@@ -76,6 +76,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Fix permissions
+        run: |
+          set -exo pipefail
+
+          sudo chown -R root system_files/
+          sudo chgrp -R root system_files/
+          sudo chmod -R a=r,u=rw system_files/
+          sudo find system_files/ -type d -exec chmod +x {} \;
+        working-directory: ${{ github.workspace }}
+
       - name: Login to Container Registry
         run: |
           sudo -E podman secret create --env=true github_token GITHUB_TOKEN
