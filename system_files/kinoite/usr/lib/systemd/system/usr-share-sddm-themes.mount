@@ -5,12 +5,11 @@
 # See https://github.com/sddm/sddm/issues/1561
 
 [Unit]
-Description=KDE writable sddm workaround
+Description=KDE writable SDDM workaround
 RequiresMountsFor=/usr /var
 ConditionPathExists=/usr/share/sddm
 ConditionPathExists=/var/usrlocal/share/sddm/themes
 ConditionPathExists=/var/usrlocal/share/sddm/themes.work
-PartOf=bazzite-kde-themes-workaround.target
 
 [Mount]
 Type=overlay

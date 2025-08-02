@@ -13,4 +13,5 @@ RUN \
   /var/scripts/common/install_software.sh; \
   /var/scripts/common/install_multimedia.sh; \
   /var/scripts/common/debloat.sh; \
+  /var/scripts/common/setup_services.sh; \
   /var/scripts/shared/ostree_commit.sh;
