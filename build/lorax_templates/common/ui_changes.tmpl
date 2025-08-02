@@ -1,1 +1,1 @@
-append etc/anaconda/profile.d/fedora-kinoite.conf "[User Interface]\\ncan_change_root = False\\ncan_change_users = True\\npassword_policies =\\n    root (quality 1, length 6)\\n    user (quality 1, length 6, empty)\\n    luks (quality 1, length 6)"
+append etc/anaconda/conf.d/10-ui-changes.conf "[User Interface]\\nhidden_spokes =\\n    PasswordSpoke\\ncan_change_root = False\\ncan_change_users = True\\npassword_policies =\\n    root (quality 1, length 6)\\n    user (quality 1, length 6, empty)\\n    luks (quality 1, length 6)"
