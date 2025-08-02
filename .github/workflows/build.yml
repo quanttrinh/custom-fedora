@@ -24,7 +24,12 @@ on:
   workflow_dispatch:
     inputs:
       push:
-        description: 'Push built images to registry'
+        description: Push built images to registry
+        required: false
+        type: boolean
+        default: false
+      make_iso:
+        description: Build ISO
         required: false
         type: boolean
         default: false
@@ -38,13 +43,15 @@ jobs:
     strategy:
       matrix:
         include:
-          - title: Fedora Kinoite
-            image: fedora-kinoite
+          - title: Fedora Kinoite (Customized)
+            base_image: fedora-kinoite
+            final_image: qt-fedora-kinoite
             variant: kinoite
             description: Customized image of Fedora Kinoite
             licenses: MIT
-          - title: Fedora Silverblue
-            image: fedora-silverblue
+          - title: Fedora Silverblue (Customized)
+            base_image: fedora-silverblue
+            final_image: qt-fedora-silverblue
             variant: silverblue
             description: Customized image of Fedora Silverblue
             licenses: MIT
@@ -55,10 +62,12 @@ jobs:
       packages: write
     with:
       registry: ghcr.io/${{ github.repository_owner }}
-      image: ${{ matrix.image }}
+      base_image: ${{ matrix.base_image }}
+      final_image: ${{ matrix.final_image }}
       variant: ${{ matrix.variant }}
       description: ${{ matrix.description }}
       title: ${{ matrix.title }}
       licenses: ${{ matrix.licenses }}
       push: ${{ inputs.push || ( github.event_name != 'pull_request' && github.ref == 'refs/heads/main' ) }}
+      make_iso: ${{ inputs.make_iso }}
     secrets: inherit

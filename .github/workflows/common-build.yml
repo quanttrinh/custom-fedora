@@ -6,7 +6,10 @@ on:
       registry:
         required: true
         type: string
-      image:
+      base_image:
+        required: true
+        type: string
+      final_image:
         required: true
         type: string
       variant:
@@ -31,7 +34,7 @@ on:
       make_iso:
         required: false
         type: boolean
-        default: true
+        default: false
 
 jobs:
   build-image:
@@ -41,7 +44,8 @@ jobs:
       packages: write
     with:
       registry: ${{ inputs.registry }}
-      image: ${{ inputs.image }}
+      base_image: ${{ inputs.base_image }}
+      final_image: ${{ inputs.final_image }}
       variant: ${{ inputs.variant }}
       description: ${{ inputs.description }}
       title: ${{ inputs.title }}
@@ -57,7 +61,7 @@ jobs:
     with:
       digest: ${{ needs.build-image.outputs.digest }}
       registry: ${{ inputs.registry }}
-      image: ${{ inputs.image }}
+      image: ${{ inputs.final_image }}
     secrets: inherit
 
   build-iso:
@@ -65,9 +69,9 @@ jobs:
     needs: [build-image, sign-image]
     if: inputs.push && inputs.make_iso
     with:
-      image_name: ${{ inputs.image }}
+      image_name: ${{ inputs.final_image }}
       image_repo: ${{ inputs.registry }}
       image_tag: ${{ needs.build-image.outputs.major_version }}
       version: ${{ needs.build-image.outputs.major_version }}
       variant: ${{ inputs.variant }}
-      iso_name: ${{ inputs.image }}-${{ needs.build-image.outputs.major_version }}.iso
+      iso_name: ${{ inputs.final_image }}-${{ needs.build-image.outputs.major_version }}.iso
