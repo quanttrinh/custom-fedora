@@ -9,7 +9,10 @@ on:
       registry:
         required: true
         type: string
-      image:
+      base_image:
+        required: true
+        type: string
+      final_image:
         required: true
         type: string
       variant:
@@ -90,7 +93,7 @@ jobs:
 
           build_date="$(date -u +"%Y%m%d%H%M%S")"
 
-          base_version="$(sudo skopeo inspect docker://quay.io/fedora/${{ inputs.image }}:latest | jq -r '.Labels."org.opencontainers.image.version"')"
+          base_version="$(sudo skopeo inspect docker://quay.io/fedora/${{ inputs.base_image }}:latest | jq -r '.Labels."org.opencontainers.image.version"')"
 
           meta_version="r${build_date}"
           final_tag="${base_version}-${meta_version}"
@@ -107,11 +110,11 @@ jobs:
         run: |
           set -exo pipefail
 
-          build_ref=containers-storage:localhost/${{ inputs.image }}-build:latest
+          build_ref=containers-storage:localhost/${{ inputs.final_image }}-build:latest
 
           sudo buildah build \
           --file build/container_files/common.Containerfile \
-          --build-arg IMAGE="quay.io/fedora/${{ inputs.image }}" \
+          --build-arg IMAGE="quay.io/fedora/${{ inputs.base_image }}" \
           --build-arg TAG="latest" \
           --format oci \
           --tls-verify=true \
@@ -129,12 +132,12 @@ jobs:
         run: |
           set -exo pipefail
 
-          build_ref=containers-storage:localhost/${{ inputs.image }}-build:latest
+          build_ref=containers-storage:localhost/${{ inputs.final_image }}-build:latest
           prev_build_ref=${{ steps.build1.outputs.build_ref }}
           prev_build_ref=${prev_build_ref#containers-storage:}
 
           sudo buildah build \
-          --file build/container_files/${{ inputs.image }}.Containerfile \
+          --file build/container_files/${{ inputs.final_image }}.Containerfile \
           --build-arg IMAGE="${prev_build_ref%%:*}" \
           --build-arg TAG="${prev_build_ref##*:}" \
           --format oci \
@@ -153,7 +156,7 @@ jobs:
         uses: hhd-dev/rechunk@master
         with:
           ref: ${{ steps.build2.outputs.build_ref }}
-          prev-ref: ${{ inputs.registry }}/${{ inputs.image }}:latest
+          prev-ref: ${{ inputs.registry }}/${{ inputs.final_image }}:latest
           rechunk: ghcr.io/hhd-dev/rechunk:latest
           version: ${{ steps.version.outputs.final_version }}
           revision: ${{ github.sha }}
@@ -194,14 +197,14 @@ jobs:
       - name: Upload Changelog
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ inputs.image }}_changelog.md
+          name: ${{ inputs.final_image }}_changelog.md
           path: ${{ steps.rechunk.outputs.changelog }}
           compression-level: 0
 
       - name: Upload Skopeo Manifest
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ inputs.image }}_manifest.json
+          name: ${{ inputs.final_image }}_manifest.json
           path: ${{ steps.rechunk.outputs.manifest }}
           compression-level: 0
 
@@ -216,5 +219,5 @@ jobs:
           echo "digest=${digest}" >> "$GITHUB_OUTPUT"
 
           for tag in "latest" "${{ steps.version.outputs.major_version }}" "${{ steps.version.outputs.final_tag }}"; do
-            sudo skopeo copy ${{ steps.rechunk.outputs.ref }} docker://${{ inputs.registry }}/${{ inputs.image }}:${tag}
+            sudo skopeo copy ${{ steps.rechunk.outputs.ref }} docker://${{ inputs.registry }}/${{ inputs.final_image }}:${tag}
           done

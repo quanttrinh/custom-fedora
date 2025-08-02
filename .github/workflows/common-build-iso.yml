@@ -1,4 +1,4 @@
-name: "Build ISO for Fedora images"
+name: "Build ISO"
 
 on:
   workflow_call:
@@ -30,7 +30,7 @@ on:
       image_name:
         required: true
         type: string
-        default: fedora-kinoite
+        default: qt-fedora-kinoite
       image_repo:
         required: true
         type: string
@@ -49,7 +49,7 @@ on:
       iso_name:
         required: true
         type: string
-        default: fedora-kinoite
+        default: qt-fedora-kinoite.iso
       image_signed:
         required: false
         type: boolean

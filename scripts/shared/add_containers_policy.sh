@@ -35,7 +35,7 @@ if [ ! -s "$POLICY_FILE" ]; then
 }
 EOF
 fi
-jq --arg variant "ghcr.io/quanttrinh/$VARIANT" '
+jq --arg variant "ghcr.io/quanttrinh/qt-fedora-$VARIANT" '
 . + {
   transports: (
     (.transports // {}) + {
