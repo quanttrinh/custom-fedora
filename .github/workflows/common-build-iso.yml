@@ -32,7 +32,7 @@ on:
         type: string
         default: qt-fedora-kinoite
       image_repo:
-        required: true
+        required: false
         type: string
       image_tag:
         required: true
