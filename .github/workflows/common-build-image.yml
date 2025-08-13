@@ -3,6 +3,9 @@
 
 name: "Build Fedora image"
 
+env:
+  base_registry: quay.io/fedora
+
 on:
   workflow_call:
     inputs:
@@ -60,10 +63,6 @@ jobs:
       specific_tag: ${{ steps.version.outputs.final_tag }}
 
     steps:
-      - name: Downcase REGISTRY
-        run: |
-          echo "REGISTRY=${REGISTRY,,}" >> ${GITHUB_ENV}
-
       - name: Reclaim disk space
         run: |
           sudo rm -rf \
@@ -104,6 +103,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Pull latest Fedora image
+        run: |
+          set -exo pipefail
+          sudo podman pull ${{ env.base_registry }}/${{ inputs.base_image }}:latest
+
       - name: Figure out version
         id: version
         run: |
@@ -111,7 +115,12 @@ jobs:
 
           build_date="$(date -u +"%Y%m%d%H%M%S")"
 
-          base_version="$(sudo skopeo inspect docker://quay.io/fedora/${{ inputs.base_image }}:latest | jq -r '.Labels."org.opencontainers.image.version"')"
+          base_version="$( \
+            sudo podman inspect \
+            --type image \
+            --format '{{index .Annotations "org.opencontainers.image.version"}}' \
+            ${{ env.base_registry }}/${{ inputs.base_image }}:latest \
+          )"
 
           meta_version="r${build_date}"
           final_tag="${base_version}-${meta_version}"
@@ -132,7 +141,7 @@ jobs:
 
           sudo buildah build \
           --file build/container_files/common.Containerfile \
-          --build-arg IMAGE="quay.io/fedora/${{ inputs.base_image }}" \
+          --build-arg IMAGE="${{ env.base_registry }}/${{ inputs.base_image }}" \
           --build-arg TAG="latest" \
           --format oci \
           --tls-verify=true \
