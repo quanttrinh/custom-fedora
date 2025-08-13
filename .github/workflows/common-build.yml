@@ -51,22 +51,11 @@ jobs:
       title: ${{ inputs.title }}
       licenses: ${{ inputs.licenses }}
       push: ${{ inputs.push }}
-
-  sign-image:
-    uses: ./.github/workflows/common-sign-image.yml
-    needs: [build-image]
-    permissions:
-      packages: write
-    if: inputs.push
-    with:
-      digest: ${{ needs.build-image.outputs.digest }}
-      registry: ${{ inputs.registry }}
-      image: ${{ inputs.final_image }}
     secrets: inherit
 
   build-iso:
     uses: ./.github/workflows/common-build-iso.yml
-    needs: [build-image, sign-image]
+    needs: [build-image]
     if: inputs.push && inputs.make_iso
     with:
       image_name: ${{ inputs.final_image }}
@@ -75,3 +64,4 @@ jobs:
       version: ${{ needs.build-image.outputs.major_version }}
       variant: ${{ inputs.variant }}
       iso_name: ${{ inputs.final_image }}-${{ needs.build-image.outputs.major_version }}.iso
+    secrets: inherit
