@@ -86,6 +86,14 @@ jobs:
           sudo find system_files/ -type d -exec chmod +x {} \;
         working-directory: ${{ github.workspace }}
 
+      - name: Update registry config
+        run: |
+          set -exo pipefail
+
+          sudo mkdir -p /etc/containers/registries.d/
+          sudo cp system_files/common/etc/containers/registries.d/ghcr.io-quanttrinh.yaml /etc/containers/registries.d/
+        working-directory: ${{ github.workspace }}
+
       - name: Login to Container Registry
         run: |
           sudo -E podman secret create --env=true github_token GITHUB_TOKEN
@@ -225,9 +233,23 @@ jobs:
         run: |
           set -exo pipefail
 
-          digest="$(sudo skopeo inspect ${{ steps.rechunk.outputs.ref }} | jq -r '.Digest')"
+          printenv SIGSTORE_KEY > sigstore.key
+          printenv SIGSTORE_KEY_PASSPHRASE > sigstore.passphrase
+
+          dest_image="docker://${{ inputs.registry }}/${{ inputs.final_image }}"
+
+          sudo skopeo copy \
+            --sign-by-sigstore-private-key sigstore.key \
+            --sign-passphrase-file sigstore.passphrase \
+            --digestfile pushed.digest \
+            ${{ steps.rechunk.outputs.ref }} ${dest_image}:${{ steps.version.outputs.final_tag }}
+
+          digest="$(cat pushed.digest)"
           echo "digest=${digest}" >> "$GITHUB_OUTPUT"
 
-          for tag in "latest" "${{ steps.version.outputs.major_version }}" "${{ steps.version.outputs.final_tag }}"; do
-            sudo skopeo copy ${{ steps.rechunk.outputs.ref }} docker://${{ inputs.registry }}/${{ inputs.final_image }}:${tag}
+          for tag in "${{ steps.version.outputs.major_version }}" "latest"; do
+            sudo skopeo copy ${dest_image}@${digest} ${dest_image}:${tag}
           done
+        env:
+          SIGSTORE_KEY_PASSPHRASE: ${{ secrets.SIGSTORE_PRIVATE_KEY_PASSPHRASE }}
+          SIGSTORE_KEY: ${{ secrets.SIGSTORE_PRIVATE_KEY }}
