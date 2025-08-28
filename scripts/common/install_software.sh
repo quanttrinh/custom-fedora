@@ -11,4 +11,5 @@ dnf install -y --best --allowerasing \
   hardinfo2 \
   zsh \
   fira-code-fonts \
-  lact
+  lact \
+  @virtualization
