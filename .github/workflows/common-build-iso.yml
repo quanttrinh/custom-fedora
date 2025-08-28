@@ -73,10 +73,27 @@ jobs:
       run: |
         set -exo pipefail
 
-        base_flatpak_refs="$(cat build/flatpak_refs/common/flatpak.refs | tr -s '[:space:]' ' ')"
-        variant_flatpak_refs="$(cat build/flatpak_refs/${{ inputs.variant }}/flatpak.refs | tr -s '[:space:]' ' ')"
+        base_flatpak_refs=$(cat build/flatpak_refs/common/flatpak.refs)
+        variant_flatpak_refs=$(cat build/flatpak_refs/${{ inputs.variant }}/flatpak.refs)
 
-        echo 'flatpak_refs="${base_flatpak_refs} ${variant_flatpak_refs}"' >> "$GITHUB_OUTPUT"
+        flatpak_refs="${base_flatpak_refs} ${variant_flatpak_refs}"
+        flatpak_refs=$(echo "${flatpak_refs}" | tr -s "[:space:]" " ")
+
+        echo "flatpak_refs=${flatpak_refs}" >> "$GITHUB_OUTPUT"
+      working-directory: ${{ github.workspace }}
+    
+    - name: Get lorax templates
+      id: lorax
+      run: |
+        set -exo pipefail
+
+        base_lorax_templates=$(ls build/lorax_templates/common | sed "s|^|/github/workspace/build/lorax_templates/common/|")
+        variant_lorax_templates=$(ls build/lorax_templates/${{ inputs.variant }} | sed "s|^|/github/workspace/build/lorax_templates/${{ inputs.variant }}/|")
+
+        lorax_templates="${base_lorax_templates} ${variant_lorax_templates}"
+        lorax_templates=$(echo "${lorax_templates}" | tr -s "[:space:]" " ")
+
+        echo "lorax_templates=${lorax_templates}" >> "$GITHUB_OUTPUT"
       working-directory: ${{ github.workspace }}
 
     - name: Build ISO
@@ -97,7 +114,7 @@ jobs:
         version: ${{ inputs.version }}
         variant: ${{ inputs.variant }}
         iso_name: ${{ inputs.iso_name }}
-        additional_templates: /github/workspace/build/lorax_templates/common/ui_changes.tmpl
+        additional_templates: ${{ steps.lorax.outputs.lorax_templates }}
 
     - name: Upload ISO
       uses: actions/upload-artifact@v4
