@@ -1,5 +1,5 @@
 com.visualstudio.code
-com.visualstudio.code.tool.podman
+com.visualstudio.code.tool.podman//stable
 com.bitwarden.desktop
 com.brave.Browser
 org.mozilla.firefox
@@ -9,8 +9,8 @@ dev.vencord.Vesktop
 com.vysp3r.ProtonPlus
 com.heroicgameslauncher.hgl
 com.valvesoftware.Steam
-org.freedesktop.Platform.VulkanLayer.MangoHud
-org.freedesktop.Platform.VulkanLayer.gamescope
+org.freedesktop.Platform.VulkanLayer.MangoHud//24.08
+org.freedesktop.Platform.VulkanLayer.gamescope//24.08
 com.github.tchx84.Flatseal
 com.github.wwmm.easyeffects
 it.mijorus.gearlever
