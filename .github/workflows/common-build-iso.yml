@@ -68,6 +68,17 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    - name: Get flatpak refs
+      id: flatpak
+      run: |
+        set -exo pipefail
+
+        base_flatpak_refs="$(cat build/flatpak_refs/common/flatpak.refs | tr -s '[:space:]' ' ')"
+        variant_flatpak_refs="$(cat build/flatpak_refs/${{ inputs.variant }}/flatpak.refs | tr -s '[:space:]' ' ')"
+
+        echo 'flatpak_refs="${base_flatpak_refs} ${variant_flatpak_refs}"' >> "$GITHUB_OUTPUT"
+      working-directory: ${{ github.workspace }}
+
     - name: Build ISO
       uses: jasonn3/build-container-installer@main
       id: iso
@@ -78,7 +89,7 @@ jobs:
         enable_flatpak_dependencies: true
         enrollment_password: "qtcustomfedora"
         secure_boot_key_url: ""
-        flatpak_remote_refs: ""
+        flatpak_remote_refs: ${{ steps.flatpak.outputs.flatpak_refs }}
         image_name: ${{ inputs.image_name }}
         image_repo: ${{ inputs.image_repo || format('ghcr.io/{0}', github.repository_owner) }}
         image_tag: ${{ inputs.image_tag }}
