@@ -8,6 +8,7 @@ fi
 
 # Parse arguments
 KARGS=""
+VARIANT=""
 for arg in "$@"; do
   case $arg in 
   --variant=*)
@@ -57,6 +58,10 @@ fi
 echo "Applying container policy..."
 ./"$FILE" "$VARIANT"
 
+# Download registrys.d configs
+wget -q "https://raw.githubusercontent.com/quanttrinh/custom-fedora/main/system_files/common/etc/containers/registries.d/ghcr.io-quanttrinh.yaml" \
+     -O /etc/containers/registries.d/ghcr.io-quanttrinh.yaml
+
 # Restore SELinux context
 echo "Restoring SELinux context..."
 restorecon -RFv /etc/containers
@@ -64,7 +69,7 @@ restorecon -RFv /etc/pki
 
 # Rebase to the new image
 echo "Rebasing to new image..."
-rpm-ostree rebase ostree-image-signed:registry:ghcr.io/quanttrinh/$VARIANT:latest
+rpm-ostree rebase ostree-image-signed:registry:ghcr.io/quanttrinh/qt-fedora-$VARIANT:latest
 
 # Check and download kargs setup helper script
 if [[ -n "${KARGS//[[:space:]]/}" ]]; then

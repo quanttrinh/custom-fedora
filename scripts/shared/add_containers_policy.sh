@@ -8,7 +8,13 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
-VARIANT=$1
+if [ "$#" -ne 1 ]; then
+  echo "Usage: $0 <variant>" >&2
+  echo "Where <variant> is either 'kinoite' or 'silverblue'" >&2
+  exit 1
+fi
+
+VARIANT="$1"
 if [[ "$VARIANT" != "kinoite" && "$VARIANT" != "silverblue" ]]; then
   echo "Usage: $0 <variant>" >&2
   echo "Where <variant> is either 'kinoite' or 'silverblue'" >&2
@@ -60,7 +66,7 @@ mv "$POLICY_FILE-tmp" "$POLICY_FILE"
 jq '
 . + {
   default: (
-    ((.default // []) | map(select(. != { "type": "insecureAcceptAnything" }))) + [{ "type": "reject" }]
+    ((.default // []) | map(if .type != "reject" then . + { "type": "reject" } else . end))
   )
 }
 ' "$POLICY_FILE" > "$POLICY_FILE-tmp"
