@@ -1,5 +1,3 @@
-com.visualstudio.code
-com.visualstudio.code.tool.podman//stable
 com.bitwarden.desktop
 com.brave.Browser
 org.mozilla.firefox
