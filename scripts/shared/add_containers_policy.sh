@@ -23,6 +23,8 @@ fi
 echo "Selected variant: $VARIANT"
 
 POLICY_FILE=/etc/containers/policy.json
+
+# Provide default if not exists
 mkdir -p /etc/containers/
 if [ ! -s "$POLICY_FILE" ]; then
     echo "$POLICY_FILE does not exist, generating default..."
@@ -34,13 +36,21 @@ if [ ! -s "$POLICY_FILE" ]; then
     }
   ],
   "transports": {
+    "containers-storage": {
+      "": [{"type":"insecureAcceptAnything"}]
+    },
     "docker-daemon": {
       "": [{"type":"insecureAcceptAnything"}]
-    }
+    },
+    "docker": {
+      "": [{"type":"insecureAcceptAnything"}]
+    },
   }
 }
 EOF
 fi
+
+# Add this repo ghcr policy
 jq --arg variant "ghcr.io/quanttrinh/qt-fedora-$VARIANT" '
 . + {
   transports: (
@@ -63,10 +73,38 @@ jq --arg variant "ghcr.io/quanttrinh/qt-fedora-$VARIANT" '
 }
 ' "$POLICY_FILE" > "$POLICY_FILE-tmp"
 mv "$POLICY_FILE-tmp" "$POLICY_FILE"
+
+# Change default to reject
 jq '
 . + {
   default: (
     ((.default // []) | map(if .type != "reject" then . + { "type": "reject" } else . end))
+  )
+}
+' "$POLICY_FILE" > "$POLICY_FILE-tmp"
+mv "$POLICY_FILE-tmp" "$POLICY_FILE"
+
+# Restore insecureAcceptAnything for common transports
+jq '
+. + {
+  transports: (
+    (.transports // {}) + {
+      "containers-storage": (
+        (.transports["containers-storage"] // {}) + {
+          "": [{"type":"insecureAcceptAnything"}]
+        }
+      ),
+      "docker-daemon": (
+        (.transports["docker-daemon"] // {}) + {
+          "": [{"type":"insecureAcceptAnything"}]
+        }
+      ),
+      "docker": (
+        (.transports["docker"] // {}) + {
+          "": [{"type":"insecureAcceptAnything"}]
+        }
+      )
+    }
   )
 }
 ' "$POLICY_FILE" > "$POLICY_FILE-tmp"
