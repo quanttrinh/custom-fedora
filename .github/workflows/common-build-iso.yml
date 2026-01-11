@@ -115,6 +115,7 @@ jobs:
         variant: ${{ inputs.variant }}
         iso_name: ${{ inputs.iso_name }}
         additional_templates: ${{ steps.lorax.outputs.lorax_templates }}
+        web_ui: true
 
     - name: Upload ISO
       uses: actions/upload-artifact@v4
